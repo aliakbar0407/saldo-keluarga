@@ -1501,7 +1501,7 @@ async function setupJoinSubmit(){
   document.getElementById('pinScreen').style.display='flex';
   document.getElementById('pinSub').textContent = 'Masuk sebagai ' + account.name;
   loadTransactions(); loadBons();
-  loadDeletePin().then(p=>{ DELETE_PIN = p; });
+  deletePinReady = loadDeletePin().then(p=>{ DELETE_PIN = p; });
   showToast('Berhasil gabung ke keluarga ' + account.name);
 }
 
@@ -1653,7 +1653,7 @@ async function finishCreateHousehold(pin){
   document.getElementById('setupCodeValue').textContent = data.id;
   showSetupStep('code');
   loadTransactions(); loadBons();
-  loadDeletePin().then(p=>{ DELETE_PIN = p; });
+  deletePinReady = loadDeletePin().then(p=>{ DELETE_PIN = p; });
 }
 async function finishResetPin(pin){
   account.pin = pin;
@@ -2567,18 +2567,19 @@ function openBonActionSheet(id){
 /* ---------------------------------------------------
    VERIFIKASI PIN UNTUK HAPUS (bisa diubah lewat Pengaturan)
 --------------------------------------------------- */
-let DELETE_PIN = '4444';
+let DELETE_PIN = '0000';
+let deletePinReady = Promise.resolve(); // di-await requestDelete() supaya DELETE_PIN dijamin sudah termuat dari server
 let delPinInput = '';
 let pendingDelete = null; // { type:'tx'|'bon', id }
 
 async function loadDeletePin(){
   const hid = getHouseholdId();
-  if(!sb || !hid) return '4444';
+  if(!sb || !hid) return '0000';
   try{
     const { data, error } = await sb.from('households').select('delete_pin').eq('id', hid).single();
-    if(error || !data) return '4444';
-    return data.delete_pin || '4444';
-  }catch(e){ return '4444'; }
+    if(error || !data) return '0000';
+    return data.delete_pin || '0000';
+  }catch(e){ return '0000'; }
 }
 async function persistDeletePin(pin){
   const hid = getHouseholdId();
@@ -2588,12 +2589,16 @@ async function persistDeletePin(pin){
   }catch(e){}
 }
 
-function requestDelete(type, id, label){
+// Menghapus transaksi/bon selalu menunggu PIN penghapus SELESAI dimuat dari server
+// terlebih dulu (lihat deletePinReady di bagian INIT), supaya tidak pernah membandingkan
+// PIN yang dimasukkan pengguna dengan nilai sementara/basi ("0000") yang belum ter-update.
+async function requestDelete(type, id, label){
   pendingDelete = { type, id };
   delPinInput = '';
   document.getElementById('deletePinTarget').textContent = label || 'item ini';
   renderDelPinDots();
   openSheet('deletePinOverlay');
+  await deletePinReady;
 }
 function closeDeletePin(){
   pendingDelete = null;
@@ -2618,6 +2623,7 @@ function renderDelPinDots(){
   document.getElementById('delPinError').classList.remove('show');
 }
 async function checkDeletePin(){
+  await deletePinReady; // pastikan DELETE_PIN sudah nilai terbaru dari server, bukan nilai sementara
   if(delPinInput===DELETE_PIN){
     const target = pendingDelete;
     pendingDelete = null;
@@ -2861,7 +2867,7 @@ setGreeting();
 initAuth();
 loadTransactions();
 loadBons();
-loadDeletePin().then(p=>{ DELETE_PIN = p; });
+deletePinReady = loadDeletePin().then(p=>{ DELETE_PIN = p; });
 
 // Daftarkan service worker supaya aplikasi bisa "Install" ke layar HP (PWA)
 if('serviceWorker' in navigator){
