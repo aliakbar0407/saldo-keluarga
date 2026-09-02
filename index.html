@@ -4,10 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Saldo Keluarga</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0B4F3F">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Saldo Keluarga">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<!-- Tesseract.js: OCR yang berjalan sepenuhnya di browser (client-side), tidak butuh server/API key -->
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 <!-- Supabase JS client: dipakai untuk menyimpan data ke database cloud, bukan localStorage lagi -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
@@ -1043,7 +1049,7 @@
       </div>
 
       <div id="scanDebugWrap" style="display:none;margin-top:14px;">
-        <button type="button" class="btn-ghost" style="font-size:12px;" onclick="toggleScanDebug()">Lihat teks mentah hasil OCR</button>
+        <button type="button" class="btn-ghost" style="font-size:12px;" onclick="toggleScanDebug()">Lihat detail hasil bacaan AI</button>
         <pre id="scanDebugText" style="display:none;white-space:pre-wrap;word-break:break-word;font-size:11px;background:var(--bg);border-radius:8px;padding:10px;margin-top:8px;max-height:220px;overflow:auto;color:var(--ink-soft);"></pre>
       </div>
     </div>
@@ -2021,324 +2027,59 @@ function resetScanSheet(){
 function handleReceiptFile(evt){
   const file = evt.target.files[0];
   if(!file) return;
-  const reader = new FileReader();
-  reader.onload = async function(e){
-    const dataUrl = e.target.result;
+  resizeImageFile(file, 1600, 0.85).then(async (dataUrl)=>{
     document.getElementById('receiptPreviewImg').src = dataUrl;
     document.getElementById('scanStep1').style.display='none';
     document.getElementById('scanStep2').style.display='block';
     document.getElementById('scanStatusBox').style.display='flex';
-    document.getElementById('scanStatusText').textContent = 'Membaca struk...';
+    document.getElementById('scanStatusText').textContent = 'Membaca struk dengan AI...';
     document.getElementById('scanResultBox').style.display='none';
     document.getElementById('scanErrorBox').style.display='none';
     await readReceipt(dataUrl);
-  };
-  reader.readAsDataURL(file);
+  }).catch(()=>{
+    showScanError('Gagal memuat foto. Silakan isi data secara manual di bawah ini.');
+  });
 }
 
-// Membaca struk sepenuhnya di browser (client-side) memakai Tesseract.js — tidak
-// butuh server atau API key, jadi tetap jalan saat file HTML ini dibuka langsung
-// di browser HP mana pun.
-let ocrWorker = null;
-let lastOcrRawText = '';
+// Membaca struk memakai AI vision (Gemini) lewat serverless function /api/scan-receipt,
+// supaya API key tidak pernah terbuka di browser. Lihat file /api/scan-receipt.js
 function toggleScanDebug(){
   const el = document.getElementById('scanDebugText');
   if(el) el.style.display = (el.style.display==='none') ? 'block' : 'none';
 }
-function showScanDebug(rawText){
-  lastOcrRawText = rawText || '';
+function showScanDebug(obj){
   const wrap = document.getElementById('scanDebugWrap');
   const el = document.getElementById('scanDebugText');
-  if(wrap) wrap.style.display = lastOcrRawText ? 'block' : 'none';
-  if(el){ el.textContent = lastOcrRawText; el.style.display='none'; }
-  console.log('[Scan Struk] Teks mentah hasil OCR:\n' + lastOcrRawText);
-}
-async function getOcrWorker(){
-  if(ocrWorker) return ocrWorker;
-  ocrWorker = await Tesseract.createWorker('ind', 1, {
-    logger: m=>{
-      if(m.status && typeof m.progress === 'number'){
-        const pct = Math.round(m.progress*100);
-        const label = m.status === 'recognizing text' ? 'Membaca teks struk' : 'Menyiapkan mesin OCR';
-        const el = document.getElementById('scanStatusText');
-        if(el) el.textContent = `${label}... ${pct}%`;
-      }
-    }
-  });
-  return ocrWorker;
+  const text = obj ? JSON.stringify(obj, null, 2) : '';
+  if(wrap) wrap.style.display = text ? 'block' : 'none';
+  if(el){ el.textContent = text; el.style.display='none'; }
 }
 
 async function readReceipt(dataUrl){
   try{
-    document.getElementById('scanStatusText').textContent = 'Menyiapkan mesin OCR...';
-    const worker = await getOcrWorker();
-    const { data } = await worker.recognize(dataUrl);
-    const text = data && data.text ? data.text : '';
-    showScanDebug(text);
+    const res = await fetch('/api/scan-receipt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataUrl })
+    });
+    const parsed = await res.json().catch(()=>null);
 
-    if(!text || text.trim().length < 4){
-      showScanError('Struk tidak dapat dibaca otomatis. Silakan isi data secara manual di bawah ini.');
+    if(!res.ok || !parsed || parsed.error){
+      showScanDebug(parsed);
+      showScanError((parsed && parsed.error) ? parsed.error : 'Struk tidak dapat dibaca otomatis. Silakan isi data secara manual di bawah ini.');
       return;
     }
+    showScanDebug(parsed);
 
-    const parsed = parseReceiptText(text);
-
-    if(!parsed.readable || !parsed.total || parsed.total<=0){
+    if(parsed.readable===false || !parsed.total || parsed.total<=0){
       showScanError('Total belanja tidak terbaca jelas di struk. Silakan isi data secara manual di bawah ini.');
       return;
     }
     showScanResult(parsed);
   }catch(err){
     console.error('Gagal membaca struk:', err);
-    showScanError('Gagal membaca struk secara otomatis. Silakan isi data secara manual di bawah ini.');
+    showScanError('Gagal menghubungi server AI. Cek koneksi internet, atau isi data secara manual di bawah ini.');
   }
-}
-
-// Jarak-edit sederhana (Levenshtein) — dipakai supaya kata kunci seperti "Total"/"Bayar"
-// masih terdeteksi walau OCR salah baca 1 huruf (mis. "TOTAS", "Bayan").
-function levenshtein(a,b){
-  const m=a.length, n=b.length;
-  if(m===0) return n;
-  if(n===0) return m;
-  const dp = new Array(n+1);
-  for(let j=0;j<=n;j++) dp[j]=j;
-  for(let i=1;i<=m;i++){
-    let prev = dp[0];
-    dp[0] = i;
-    for(let j=1;j<=n;j++){
-      const tmp = dp[j];
-      dp[j] = a[i-1]===b[j-1] ? prev : 1+Math.min(prev, dp[j], dp[j-1]);
-      prev = tmp;
-    }
-  }
-  return dp[n];
-}
-// Cari semua kata di sebuah baris yang mirip (jarak-edit <= maxDist) dengan salah satu
-// kata di canonList. Mengembalikan posisi (index/end) tiap kecocokan, berurutan sesuai baris.
-function fuzzyFindWords(line, canonList, maxDist){
-  const re = /[A-Za-z]+/g;
-  const out = [];
-  let m;
-  while((m = re.exec(line))){
-    const w = m[0].toLowerCase();
-    for(const canon of canonList){
-      if(Math.abs(w.length-canon.length) <= maxDist && levenshtein(w,canon) <= maxDist){
-        out.push({ index:m.index, end:m.index+m[0].length });
-        break;
-      }
-    }
-  }
-  return out;
-}
-
-// Parser regex/fuzzy untuk hasil teks OCR struk belanja Indonesia. Toleran terhadap
-// salah baca huruf 1 karakter pada kata kunci ("TOTAL"->"TOTAS", "Bayar"->"Bayan"),
-// dan mencocokkan tiga sumber nominal (baris Total, Bayar-Kembali, jumlah semua item)
-// untuk saling memvalidasi kalau salah satunya rusak dibaca OCR.
-function parseReceiptText(rawText){
-  // Perbaiki salah baca OCR yang umum terjadi PERSIS di antara/menempel digit
-  // (mis. "o" terbaca padahal "0", "S" padahal "5"), tanpa mengubah teks non-angka.
-  const fixedText = rawText
-    .replace(/(?<=\d)[oO](?=\d)/g, '0')
-    .replace(/(?<=\d)[oO]\b/g, '0')
-    .replace(/(?<=\d)[lI](?=\d)/g, '1')
-    .replace(/(?<=\d)[sS](?=\d)/g, '5')
-    .replace(/(?<=\d)[bB](?=\d)/g, '8');
-
-  const lines = fixedText.split('\n').map(l=>l.trim()).filter(Boolean);
-
-  const numberPattern = /(\d{1,3}(?:[.,]\d{3})+|\d{4,})/g; // angka ribuan (45.000 / 45,000) atau angka polos >=4 digit
-  function numbersInText(str){
-    const matches = str.match(numberPattern) || [];
-    return matches
-      .filter(m => !(/^\d+$/.test(m) && m.length > 8)) // buang angka polos panjang (kemungkinan barcode/no. struk)
-      .map(cleanRupiahNumber)
-      .filter(n=>n>0);
-  }
-
-  const bayarCanon = ['bayar','tunai','cash'];
-  const kembaliCanon = ['kembali','kembalian','change'];
-  const totalCanon = ['total'];
-  const jumlahCanon = ['jumlah'];
-  const excludeAfterCanon = ['qty','item','barang','pcs'];
-
-  // Cari nominal yang mengikuti kemunculan salah satu "kata kunci" (toleran typo) di sebuah baris.
-  // Otomatis dipotong sebelum kata Bayar/Tunai/Kembali dst kalau baris ternyata gabungan beberapa baris asli.
-  function amountForFuzzyKeyword(line, canonList, maxDist){
-    const matches = fuzzyFindWords(line, canonList, maxDist);
-    for(const mt of matches){
-      const before = line.slice(Math.max(0, mt.index-5), mt.index).toLowerCase();
-      if(/sub\W*$/.test(before)) continue; // lewati "subtotal"
-      const afterWordMatch = line.slice(mt.end).match(/[A-Za-z]+/);
-      if(afterWordMatch && excludeAfterCanon.some(ex=>levenshtein(afterWordMatch[0].toLowerCase(),ex)<=1)) continue; // lewati "Total Qty/Item"
-      let after = line.slice(mt.end);
-      const stop = fuzzyFindWords(after, [...bayarCanon, ...kembaliCanon], 1);
-      if(stop.length) after = after.slice(0, stop[0].index);
-      const nums = numbersInText(after);
-      if(nums.length) return nums[0];
-    }
-    return null;
-  }
-
-  // --- Sumber 1: baris "Total"/"Jumlah" (dicari dari bawah — nominal akhir biasanya di bawah) ---
-  let totalFromKeyword = null;
-  const reversed = [...lines].reverse();
-  for(const line of reversed){
-    const amt = amountForFuzzyKeyword(line, totalCanon, 1) ?? amountForFuzzyKeyword(line, jumlahCanon, 1);
-    if(amt){ totalFromKeyword = amt; break; }
-  }
-
-  // --- Sumber 2: turunan dari Bayar - Kembali ---
-  let bayar = null, kembali = null;
-  for(const line of lines){
-    if(bayar===null){ const b = amountForFuzzyKeyword(line, bayarCanon, 1); if(b) bayar = b; }
-    if(kembali===null){ const k = amountForFuzzyKeyword(line, kembaliCanon, 1); if(k) kembali = k; }
-  }
-  let totalFromBayarKembali = null;
-  if(bayar!==null && kembali!==null && bayar>=kembali) totalFromBayarKembali = bayar - kembali;
-  else if(bayar!==null && kembali===null) totalFromBayarKembali = bayar; // asumsi uang pas
-
-  // --- Ekstrak item belanja (dibutuhkan juga sebagai sumber ke-3: jumlah semua item) ---
-  // Pola umum struk kasir: nama barang di satu baris, baris berikutnya "<qty> <satuan> <harga> = <subtotal>".
-  // Pemisah "=" kadang terbaca OCR sebagai "-"/"–"/"—", jadi semua varian itu diterima.
-  const items = [];
-  const qtyLinePattern = /^\d+\s+\S+\s+[\d.,]+\s*[=\-\u2013\u2014]\s*([\d.,]+)/;
-  for(let i=1;i<lines.length;i++){
-    const m = lines[i].match(qtyLinePattern);
-    if(!m) continue;
-    const price = cleanRupiahNumber(m[1]);
-    const nameLine = lines[i-1];
-    if(price>0 && nameLine && !/^\d/.test(nameLine) && !qtyLinePattern.test(nameLine)){
-      items.push({ name: nameLine, price });
-    }
-  }
-  // Pass ke-2: baris qty/harga yang rusak PARAH oleh OCR (mis. "Li .RIG 4,250 – Tee SU" — hanya
-  // tersisa satu angka yang bisa dibaca, sisanya jadi huruf acak) tidak cocok pola di atas.
-  // Kalau baris SEBELUMnya jelas nama produk (bukan angka, dan tidak punya angka harga sendiri)
-  // dan baris ini punya TEPAT SATU angka yang masuk akal serta bukan bagian dari Total/Bayar/
-  // Kembali/footer, pasangkan sebagai item juga.
-  const consumedNames = new Set(items.map(it=>it.name));
-  for(let i=1;i<lines.length;i++){
-    const line = lines[i];
-    if(qtyLinePattern.test(line)) continue; // sudah ditangani pass pertama
-    const nameLine = lines[i-1];
-    if(!nameLine || consumedNames.has(nameLine)) continue;
-    if(/^\d/.test(nameLine) || qtyLinePattern.test(nameLine)) continue;
-    if(numbersInText(nameLine).length>0) continue; // nama asli tidak akan punya angka harga sendiri
-    if(fuzzyFindWords(line, [...totalCanon,...jumlahCanon,...bayarCanon,...kembaliCanon], 1).length) continue;
-    if(/terima\s*kasih/i.test(line)) continue;
-    const nums = numbersInText(line);
-    if(nums.length===1){
-      items.push({ name: nameLine, price: nums[0] });
-      consumedNames.add(nameLine);
-    }
-  }
-  const itemSum = items.reduce((s,it)=>s+it.price, 0);
-
-  // --- Validasi silang: pilih nilai yang paling didukung oleh sumber lain ---
-  // Bayar-Kembali diberi bobot lebih tinggi karena terbukti lebih tahan salah-baca OCR
-  // dibanding baris "Total" itu sendiri (baris Total sering jadi korban 1-2 huruf/digit salah baca).
-  const candidates = [];
-  if(totalFromBayarKembali) candidates.push({ v: totalFromBayarKembali, w: 2 });
-  if(totalFromKeyword) candidates.push({ v: totalFromKeyword, w: 1 });
-  if(itemSum>0) candidates.push({ v: itemSum, w: 1 });
-  function closeEnough(a,b){ return Math.abs(a-b) <= Math.max(500, a*0.02); }
-  let total = 0;
-  if(candidates.length){
-    let best = candidates[0], bestScore = -1;
-    for(const c of candidates){
-      const score = candidates.filter(o=>closeEnough(o.v,c.v)).reduce((s,o)=>s+o.w, 0);
-      if(score>bestScore){ bestScore=score; best=c; }
-    }
-    total = best.v;
-  }
-
-  // --- Cari tanggal ---
-  let date = null;
-  const monthMap = {jan:'01',feb:'02',mar:'03',apr:'04',mei:'05',may:'05',jun:'06',jul:'07',
-    agu:'08',ags:'08',aug:'08',sep:'09',okt:'10',oct:'10',nov:'11',des:'12',dec:'12'};
-  const monthNamePattern = /(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})/;
-  const datePatterns = [
-    { re: /(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/, order: 'ymd' },
-    { re: /(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/, order: 'dmy' },
-    { re: /(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2})\b/, order: 'dmy2' }
-  ];
-  for(const line of lines){
-    // Format "30 Jul 2026" / "30 Juli 2026" dicek lebih dulu karena umum di struk kasir
-    const mn = line.match(monthNamePattern);
-    if(mn){
-      const mon = monthMap[mn[2].toLowerCase().slice(0,3)];
-      if(mon){
-        const d = mn[1].padStart(2,'0');
-        if(Number(d)>=1 && Number(d)<=31){
-          date = `${mn[3]}-${mon}-${d}`;
-          break;
-        }
-      }
-    }
-    for(const p of datePatterns){
-      const m = line.match(p.re);
-      if(m){
-        let y,mo,d;
-        if(p.order==='ymd'){ y=m[1]; mo=m[2]; d=m[3]; }
-        else if(p.order==='dmy'){ d=m[1]; mo=m[2]; y=m[3]; }
-        else { d=m[1]; mo=m[2]; y='20'+m[3]; }
-        mo = mo.padStart(2,'0'); d = d.padStart(2,'0');
-        if(Number(mo)>=1 && Number(mo)<=12 && Number(d)>=1 && Number(d)<=31){
-          date = `${y}-${mo}-${d}`;
-        }
-        break;
-      }
-    }
-    if(date) break;
-  }
-
-  // --- Tebak nama toko: baris di 6 baris teratas yang murni huruf (tanpa angka/titik dua),
-  // supaya tidak salah ambil baris "Nota :", "Customer :", dst sebagai nama toko ---
-  let merchant = null;
-  for(const line of lines.slice(0,6)){
-    if(/\d/.test(line) || /:/.test(line)) continue;
-    if(/^(nota|customer|operator|no\b|kasir)/i.test(line)) continue;
-    if(line.replace(/[^a-zA-Z]/g,'').length>=3){
-      merchant = line;
-      break;
-    }
-  }
-
-  // --- Tebak kategori dari kata kunci umum ---
-  const fullTextLower = fixedText.toLowerCase();
-  const categoryKeywords = [
-    { cat:'Transportasi', kws:['spbu','pertamina','shell','parkir','tol','ojek','grab','gojek','bensin'] },
-    { cat:'Kesehatan', kws:['apotek','klinik','farmasi','rumah sakit','dokter'] },
-    { cat:'Pendidikan', kws:['sekolah','kampus','buku','alat tulis'] },
-    { cat:'Tagihan', kws:['pln','pdam','listrik','wifi','indihome','pulsa','token'] },
-    { cat:'Hiburan', kws:['cinema','bioskop','xxi','netflix','karaoke'] },
-    { cat:'Jajan', kws:['snack','jajan'] },
-    { cat:'Belanja Harian', kws:['indomaret','alfamart','minimarket'] },
-    { cat:'Belanja Bulanan', kws:['pasar','supermarket','swalayan'] }
-  ];
-  let category = 'Belanja Harian';
-  for(const c of categoryKeywords){
-    if(c.kws.some(k=>fullTextLower.includes(k))){ category = c.cat; break; }
-  }
-
-  return {
-    merchant,
-    date,
-    total,
-    category,
-    items,
-    readable: total > 0,
-    _rawText: rawText // disimpan untuk debug, bukan ditampilkan ke user
-  };
-}
-
-// Mengubah nilai angka/format Rupiah dari hasil AI (mis. "Rp45.000", "45,000", 45000) menjadi Number murni
-function cleanRupiahNumber(val){
-  if(typeof val === 'number') return Math.round(val);
-  if(!val) return 0;
-  const digitsOnly = String(val).replace(/[^\d]/g,'');
-  return digitsOnly ? Number(digitsOnly) : 0;
 }
 
 // Cocokkan kategori hasil bacaan AI ke daftar kategori resmi, toleran terhadap beda kapital/spasi
@@ -3121,6 +2862,13 @@ initAuth();
 loadTransactions();
 loadBons();
 loadDeletePin().then(p=>{ DELETE_PIN = p; });
+
+// Daftarkan service worker supaya aplikasi bisa "Install" ke layar HP (PWA)
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  });
+}
 
 </script>
 </body>
