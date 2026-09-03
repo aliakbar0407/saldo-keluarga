@@ -72,27 +72,46 @@ Balas HANYA JSON sesuai schema, tanpa penjelasan tambahan.`;
   try {
     const model = 'gemini-flash-latest';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-    const geminiRes = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey
-      },
-      body: JSON.stringify({
-        contents: [{
-          role: 'user',
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: mimeType, data: base64Data } }
-          ]
-        }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: RECEIPT_SCHEMA,
-          temperature: 0.1
-        }
-      })
-    });
+
+    // Batas waktu 50 detik (di bawah maxDuration 60 detik di vercel.json), supaya kalau
+    // Gemini lambat, kita yang balas error JSON rapi duluan — bukan Vercel yang matikan
+    // paksa function ini dan bikin HP pengguna menunggu tanpa kepastian.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 50000);
+
+    let geminiRes;
+    try{
+      geminiRes = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey
+        },
+        body: JSON.stringify({
+          contents: [{
+            role: 'user',
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: mimeType, data: base64Data } }
+            ]
+          }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseSchema: RECEIPT_SCHEMA,
+            temperature: 0.1
+          }
+        }),
+        signal: controller.signal
+      });
+    }catch(fetchErr){
+      if(fetchErr.name === 'AbortError'){
+        res.status(504).json({ error: 'AI terlalu lama merespons, coba scan ulang atau isi manual' });
+        return;
+      }
+      throw fetchErr;
+    }finally{
+      clearTimeout(timeoutId);
+    }
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text().catch(() => '');
