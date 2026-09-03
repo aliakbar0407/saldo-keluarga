@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Saldo Keluarga</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0B4F3F">
+<meta name="theme-color" content="#FF7A50">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,41 +13,47 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <!-- Supabase JS client: dipakai untuk menyimpan data ke database cloud, bukan localStorage lagi -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   :root{
-    --bg:#F5F6F1;
+    --bg:#FFF6E9;
     --surface:#FFFFFF;
-    --ink:#16231C;
-    --ink-soft:#66766B;
-    --ink-faint:#9AA79E;
-    --primary:#0B4F3F;
-    --primary-2:#0E6650;
-    --primary-3:#0A3E32;
-    --primary-soft:#E3EEE7;
-    --income:#1F9C6E;
-    --income-soft:#E6F5EE;
-    --expense:#BF5A35;
-    --expense-soft:#FBEBE3;
-    --line:#E7E9E2;
-    --radius-lg:24px;
-    --radius-md:16px;
-    --radius-sm:10px;
-    --shadow:0 10px 30px -14px rgba(11,79,63,0.25);
+    --ink:#3A2B1A;
+    --ink-soft:#9C8770;
+    --ink-faint:#D8C6A8;
+    --primary:#FF7A50;
+    --primary-2:#FF9466;
+    --primary-3:#E85A34;
+    --primary-soft:#FFE4D6;
+    --income:#2BB673;
+    --income-soft:#E1F7EC;
+    --expense:#FF6B6B;
+    --expense-soft:#FFE9E9;
+    --accent-yellow:#FFC93C;
+    --accent-yellow-soft:#FFF3D6;
+    --accent-purple:#B18CFF;
+    --accent-purple-soft:#EEE6FF;
+    --accent-blue:#4FB3E8;
+    --accent-blue-soft:#E3F4FC;
+    --line:#F3E4CB;
+    --radius-lg:28px;
+    --radius-md:20px;
+    --radius-sm:14px;
+    --shadow:0 14px 32px -14px rgba(232,90,52,0.32);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;}
   body{
     background:var(--bg);
-    font-family:'Inter',sans-serif;
+    font-family:'Nunito',sans-serif;
     color:var(--ink);
     display:flex;
     justify-content:center;
     min-height:100vh;
   }
-  .display{font-family:'Plus Jakarta Sans',sans-serif;}
+  .display{font-family:'Baloo 2',sans-serif;}
   .mono{font-family:'IBM Plex Mono',monospace; font-variant-numeric: tabular-nums;}
 
   #app{
@@ -115,7 +121,7 @@
   .theme-swatch{
     display:flex; align-items:center; gap:10px; padding:12px 14px;
     border-radius:var(--radius-md); border:1.5px solid var(--line); background:var(--surface);
-    cursor:pointer; font-family:'Inter',sans-serif; font-size:13px; font-weight:600; color:var(--ink);
+    cursor:pointer; font-family:'Nunito',sans-serif; font-size:13px; font-weight:600; color:var(--ink);
   }
   .theme-swatch.selected{border-color:var(--primary); background:var(--primary-soft); color:var(--primary);}
   .theme-swatch-dot{width:26px;height:26px;border-radius:50%;flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.06);}
@@ -189,7 +195,7 @@
     align-items:center;
     gap:7px;
     cursor:pointer;
-    font-family:'Inter',sans-serif;
+    font-family:'Nunito',sans-serif;
     font-size:12px;
     font-weight:600;
     color:var(--ink);
@@ -202,8 +208,8 @@
   }
   .qa-icon.in{background:var(--income-soft); color:var(--income);}
   .qa-icon.out{background:var(--expense-soft); color:var(--expense);}
-  .qa-icon.scan{background:var(--primary-soft); color:var(--primary);}
-  .qa-icon.bon{background:#FDECC8; color:#9A6A0A;}
+  .qa-icon.scan{background:var(--accent-yellow-soft); color:#B8790A;}
+  .qa-icon.bon{background:var(--accent-purple-soft); color:#7A4FE0;}
 
   /* ---------- Sections ---------- */
   .section{padding:22px 20px 0 20px;}
@@ -238,6 +244,7 @@
     width:38px;height:38px;border-radius:50%;
     display:flex;align-items:center;justify-content:center;
     flex-shrink:0;
+    font-size:17px;
   }
   .tx-icon.in{background:var(--income-soft);color:var(--income);}
   .tx-icon.out{background:var(--expense-soft);color:var(--expense);}
@@ -269,7 +276,7 @@
   }
   .report-mode-tabs button{
     flex:1; border:none; background:none; padding:9px 0; border-radius:10px;
-    font-family:'Inter',sans-serif; font-weight:600; font-size:13px; color:var(--ink-soft); cursor:pointer;
+    font-family:'Nunito',sans-serif; font-weight:600; font-size:13px; color:var(--ink-soft); cursor:pointer;
   }
   .report-mode-tabs button.active{ background:var(--primary); color:#fff; }
   .month-switch{
@@ -286,7 +293,7 @@
   }
   .day-switch svg{color:var(--primary); flex-shrink:0;}
   .day-switch input[type=date]{
-    border:none; padding:0; font-family:'Plus Jakarta Sans',sans-serif; font-weight:700; font-size:14px;
+    border:none; padding:0; font-family:'Baloo 2',sans-serif; font-weight:700; font-size:14px;
     color:var(--ink); background:none; width:100%;
   }
   .report-summary{display:flex; gap:10px; margin-bottom:18px;}
@@ -321,7 +328,7 @@
     background:none;border:none;cursor:pointer;
     padding:6px 2px;
     color:var(--ink-faint);
-    font-family:'Inter',sans-serif;
+    font-family:'Nunito',sans-serif;
     font-size:10.5px;
     font-weight:600;
   }
@@ -368,16 +375,20 @@
     border-radius:var(--radius-md);
     padding:12px 14px;
     font-size:14px;
-    font-family:'Inter',sans-serif;
+    font-family:'Nunito',sans-serif;
     color:var(--ink);
     outline:none;
   }
   textarea{resize:none;min-height:60px;}
-  .cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
   .cat-chip{
     border:1.5px solid var(--line); background:var(--surface); border-radius:var(--radius-sm);
-    padding:10px 6px; text-align:center; font-size:12px; font-weight:600; cursor:pointer; color:var(--ink-soft);
+    padding:12px 6px; text-align:center; font-size:11.5px; font-weight:700; cursor:pointer; color:var(--ink-soft);
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    transition:transform .1s ease, border-color .1s ease;
   }
+  .cat-chip:active{transform:scale(0.95);}
+  .cat-chip .cat-emoji{font-size:20px; line-height:1;}
   .cat-chip.active.in{border-color:var(--income); background:var(--income-soft); color:var(--income);}
   .cat-chip.active.out{border-color:var(--expense); background:var(--expense-soft); color:var(--expense);}
 
@@ -386,7 +397,7 @@
     border:none;
     background:var(--primary);
     color:#fff;
-    font-family:'Inter',sans-serif;
+    font-family:'Nunito',sans-serif;
     font-weight:700;
     font-size:15px;
     padding:15px;
@@ -471,7 +482,7 @@
   /* transaction detail sheet */
   .tx-item{cursor:pointer;}
   .txd-head{display:flex; align-items:center; gap:12px; margin-bottom:16px;}
-  .txd-head .tx-icon{width:46px;height:46px;flex-shrink:0;}
+  .txd-head .tx-icon{width:46px;height:46px;flex-shrink:0;font-size:21px;}
   .txd-head .tx-name{font-size:15px;margin:0 0 3px 0;}
   .txd-amount{font-size:26px;font-weight:700;margin:0 0 18px 0;}
   .txd-amount.in{color:var(--income);}
@@ -519,7 +530,7 @@
   }
   .pin-dot.filled{background:#fff; transform:scale(1.08);}
   .pin-error{
-    font-size:12px; color:#FFB4A0; height:16px; margin:0 0 18px 0;
+    font-size:12px; color:#FFF3D6; height:16px; margin:0 0 18px 0;
     opacity:0; transition:opacity .15s ease;
   }
   .pin-error.show{opacity:1;}
@@ -529,7 +540,7 @@
   }
   .pin-key{
     aspect-ratio:1; border-radius:50%; border:1px solid rgba(255,255,255,0.25);
-    background:rgba(255,255,255,0.08); color:#fff; font-family:'Plus Jakarta Sans',sans-serif;
+    background:rgba(255,255,255,0.08); color:#fff; font-family:'Baloo 2',sans-serif;
     font-size:20px; font-weight:600; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
   }
@@ -538,18 +549,18 @@
   .setup-name-input{
     width:100%; background:rgba(255,255,255,0.12); border:1.5px solid rgba(255,255,255,0.3);
     border-radius:var(--radius-md); padding:13px 14px; font-size:15px; color:#fff;
-    outline:none; text-align:center; font-family:'Inter',sans-serif; margin-bottom:16px;
+    outline:none; text-align:center; font-family:'Nunito',sans-serif; margin-bottom:16px;
   }
   .setup-name-input::placeholder{color:rgba(255,255,255,0.55);}
   .btn-setup{
     width:100%; border:none; background:#fff; color:var(--primary);
-    font-family:'Inter',sans-serif; font-weight:700; font-size:15px;
+    font-family:'Nunito',sans-serif; font-weight:700; font-size:15px;
     padding:14px; border-radius:var(--radius-md); cursor:pointer;
   }
   .btn-setup:active{transform:scale(0.98);}
   .pin-forgot-link{
     background:none;border:none;color:rgba(255,255,255,0.75);font-size:12px;
-    margin-top:20px;text-decoration:underline;cursor:pointer;font-family:'Inter',sans-serif;
+    margin-top:20px;text-decoration:underline;cursor:pointer;font-family:'Nunito',sans-serif;
   }
   .setup-steps{display:flex; gap:6px; margin-bottom:20px;}
   .setup-steps span{flex:1; height:3px; border-radius:3px; background:rgba(255,255,255,0.25);}
@@ -572,13 +583,13 @@
   .bon-actions{display:flex; flex-direction:column; align-items:flex-end; gap:5px; flex-shrink:0;}
   .bon-status-btn{
     border:none; border-radius:20px; padding:4px 10px; font-size:10.5px; font-weight:700;
-    cursor:pointer; font-family:'Inter',sans-serif; white-space:nowrap;
+    cursor:pointer; font-family:'Nunito',sans-serif; white-space:nowrap;
   }
   .bon-status-btn.belum{background:var(--expense-soft); color:var(--expense);}
   .bon-status-btn.sudah{background:var(--income-soft); color:var(--income);}
   .bon-cicil-badge{
     border:none; border-radius:20px; padding:4px 10px; font-size:10.5px; font-weight:700;
-    font-family:'Inter',sans-serif; white-space:nowrap; background:var(--primary-soft); color:var(--primary);
+    font-family:'Nunito',sans-serif; white-space:nowrap; background:var(--primary-soft); color:var(--primary);
   }
 
   /* ---------- 3-dot option button (ganti ikon sampah) ---------- */
@@ -598,7 +609,7 @@
   .bon-pay-btn{
     width:100%; border:1.5px solid var(--primary); background:var(--primary-soft); color:var(--primary);
     font-weight:700; font-size:12.5px; padding:9px; border-radius:var(--radius-sm); cursor:pointer;
-    font-family:'Inter',sans-serif; display:flex; align-items:center; justify-content:center; gap:6px;
+    font-family:'Nunito',sans-serif; display:flex; align-items:center; justify-content:center; gap:6px;
   }
 
   /* ---------- Action sheet (menu opsi) ---------- */
@@ -606,7 +617,7 @@
     width:100%; display:flex; align-items:center; gap:12px; text-align:left;
     background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md);
     padding:13px 14px; font-size:14px; font-weight:600; color:var(--ink);
-    cursor:pointer; margin-bottom:8px; font-family:'Inter',sans-serif;
+    cursor:pointer; margin-bottom:8px; font-family:'Nunito',sans-serif;
   }
   .action-item svg{flex-shrink:0;}
   .action-item.danger{color:var(--expense); border-color:#F1CBB8;}
@@ -631,7 +642,7 @@
   }
   .del-pin-key{
     aspect-ratio:1; border-radius:50%; border:1px solid var(--line);
-    background:var(--surface); color:var(--ink); font-family:'Plus Jakarta Sans',sans-serif;
+    background:var(--surface); color:var(--ink); font-family:'Baloo 2',sans-serif;
     font-size:19px; font-weight:600; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
   }
@@ -1386,10 +1397,11 @@ async function joinHousehold(code){
 
 /* ---- Tema Dashboard ---- */
 const THEME_PRESETS = {
-  green:  { primary:'#0B4F3F', primary2:'#0E6650', primary3:'#0A3E32', primarySoft:'#E3EEE7', label:'Hijau' },
-  blue:   { primary:'#123C64', primary2:'#1E5C93', primary3:'#0B2A47', primarySoft:'#E3EDF7', label:'Biru' },
-  pink:   { primary:'#7A2E4D', primary2:'#A34568', primary3:'#551F37', primarySoft:'#FAE7EE', label:'Pink' },
-  yellow: { primary:'#9C7A17', primary2:'#C79A2E', primary3:'#6E560F', primarySoft:'#FBF3D9', label:'Kuning Pastel' }
+  green:  { primary:'#FF7A50', primary2:'#FF9466', primary3:'#E85A34', primarySoft:'#FFE4D6', label:'Koral' },
+  mint:   { primary:'#2BB673', primary2:'#4FD08A', primary3:'#1E8F58', primarySoft:'#DFF7EA', label:'Hijau Segar' },
+  blue:   { primary:'#3FA9DA', primary2:'#63C3EA', primary3:'#2C86B3', primarySoft:'#E1F4FC', label:'Biru Langit' },
+  pink:   { primary:'#FF6FA0', primary2:'#FF93B8', primary3:'#D94A7D', primarySoft:'#FFE3EE', label:'Pink Ceria' },
+  yellow: { primary:'#E8A33D', primary2:'#F2B85C', primary3:'#C27F1F', primarySoft:'#FDF0DC', label:'Kuning Cerah' }
 };
 function applyTheme(theme){
   const t = theme || { preset:'green' };
@@ -1714,6 +1726,14 @@ let transactions = [];
 const CATS_IN = ['Gaji','Bonus','Usaha','Hadiah','Lainnya'];
 const CATS_OUT = ['Belanja Bulanan','Belanja Harian','Pendidikan','Tagihan','Jajan','Kesehatan','Hiburan','Saku Kakak','Saku Adik','Transportasi','Lainnya'];
 
+// Emoji per kategori — sentuhan hangat & gampang dikenali sekilas (juga oleh anak-anak)
+const CATEGORY_EMOJI = {
+  'Gaji':'💼','Bonus':'🎁','Usaha':'🏪','Hadiah':'🎉',
+  'Belanja Bulanan':'🛒','Belanja Harian':'🧺','Pendidikan':'📚','Tagihan':'💡',
+  'Jajan':'🍬','Kesehatan':'💊','Hiburan':'🎬','Saku Kakak':'👦','Saku Adik':'👧',
+  'Transportasi':'🚌','Lainnya':'✨'
+};
+
 const ICONS = {
   in: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
   out: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12l7 7 7-7"/></svg>'
@@ -1865,7 +1885,7 @@ function renderTxList(elId, list, compact){
     row.className='tx-item';
     row.onclick = ()=> openTxDetail(t.id);
     row.innerHTML = `
-      <div class="tx-icon ${t.type}">${ICONS[t.type]}</div>
+      <div class="tx-icon ${t.type}">${CATEGORY_EMOJI[t.category] || ICONS[t.type]}</div>
       <div class="tx-mid">
         <p class="tx-name">${escapeHtml(t.note || t.category)}</p>
         <p class="tx-cat">${escapeHtml(t.category)} · ${formatShortDate(t.date)}</p>
@@ -1911,7 +1931,7 @@ function openTxDetail(id){
 
   document.getElementById('txDetailBody').innerHTML = `
     <div class="txd-head">
-      <div class="tx-icon ${t.type}">${ICONS[t.type]}</div>
+      <div class="tx-icon ${t.type}">${CATEGORY_EMOJI[t.category] || ICONS[t.type]}</div>
       <div class="tx-mid">
         <p class="tx-name">${escapeHtml(t.note || t.category)}</p>
         <p class="tx-cat">${escapeHtml(t.category)} · ${formatFullDate(t.date)}</p>
@@ -1964,7 +1984,7 @@ function buildCatGrid(containerId, type, onSelect, preset){
   cats.forEach(cat=>{
     const chip = document.createElement('div');
     chip.className = 'cat-chip' + (preset===cat ? ' active '+type : '');
-    chip.textContent = cat;
+    chip.innerHTML = `<span class="cat-emoji">${CATEGORY_EMOJI[cat] || '✨'}</span><span>${escapeHtml(cat)}</span>`;
     chip.onclick = ()=>{
       grid.querySelectorAll('.cat-chip').forEach(c=>c.classList.remove('active','in','out'));
       chip.classList.add('active', type);
