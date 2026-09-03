@@ -71,19 +71,28 @@
   .topbar{
     padding:22px 20px 0 20px;
     display:flex;
-    align-items:center;
+    align-items:flex-start;
     justify-content:space-between;
   }
-  .greet-eyebrow{
-    font-size:12px;
-    color:var(--ink-soft);
-    margin:0 0 2px 0;
-    letter-spacing:.02em;
-  }
   .greet-name{
-    font-size:19px;
+    font-size:22px;
     font-weight:700;
     margin:0;
+    line-height:1.25;
+  }
+  .greet-date{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    font-weight:600;
+    margin:3px 0 0 0;
+  }
+  .greet-dua{
+    font-size:12px;
+    color:var(--primary-3);
+    font-weight:600;
+    margin:7px 0 0 0;
+    max-width:280px;
+    line-height:1.4;
   }
   .avatar{
     width:40px;height:40px;border-radius:50%;
@@ -760,8 +769,9 @@
   <div id="view-beranda">
     <div class="topbar">
       <div>
-        <p class="greet-eyebrow" id="greetTime">Selamat datang</p>
-        <p class="greet-name display" id="dashboardGreetName">Saldo Keluarga</p>
+        <p class="greet-name display" id="dashboardGreetName">Selamat datang</p>
+        <p class="greet-date" id="greetDate"></p>
+        <p class="greet-dua" id="greetDua"></p>
       </div>
       <div class="topbar-actions">
         <button class="gear-btn" onclick="openSettingsSheet()" title="Pengaturan">
@@ -1555,8 +1565,7 @@ function unlockApp(){
 }
 function applyAccountToUI(){
   if(!account) return;
-  const nameEl = document.getElementById('dashboardGreetName');
-  if(nameEl) nameEl.textContent = account.name;
+  renderGreetingBlock();
   renderAvatarEl(document.getElementById('dashboardAvatar'));
 }
 function renderAvatarEl(el){
@@ -1811,14 +1820,44 @@ function switchView(name){
   window.scrollTo({top:0});
 }
 
+// Do'a harian seputar keluarga & rezeki — berganti otomatis tiap hari (mengikuti hari dalam seminggu)
+const DAILY_DUA = [
+  'Ya Allah, berkahilah rezeki keluarga kami dan jauhkan dari sifat boros.',
+  'Ya Allah, cukupkanlah kami dengan yang halal, jauh dari yang haram.',
+  'Ya Allah, jadikan kami keluarga yang saling menjaga dalam suka dan duka.',
+  'Ya Allah, lapangkanlah rezeki kami dan berkahi setiap usaha kami.',
+  'Ya Allah, satukan hati keluarga kami dalam mengelola rezeki dengan bijak.',
+  'Ya Allah, jauhkan keluarga kami dari utang yang memberatkan.',
+  'Ya Allah, jadikan harta kami berkah dan bermanfaat bagi keluarga.'
+];
+
+let currentGreetingWord = 'Selamat pagi';
 function setGreeting(){
-  const h = new Date().getHours();
+  const now = new Date();
+  const h = now.getHours();
   let txt = 'Selamat pagi';
   if(h>=11 && h<15) txt='Selamat siang';
   else if(h>=15 && h<18) txt='Selamat sore';
   else if(h>=18 || h<4) txt='Selamat malam';
-  const el = document.getElementById('greetTime');
-  if(el) el.textContent = txt;
+  currentGreetingWord = txt;
+  renderGreetingBlock();
+
+  const dateEl = document.getElementById('greetDate');
+  if(dateEl){
+    const dateStr = now.toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+    dateEl.textContent = 'Hari ini ' + dateStr;
+  }
+  const duaEl = document.getElementById('greetDua');
+  if(duaEl){
+    duaEl.textContent = '🤲 ' + DAILY_DUA[now.getDay() % DAILY_DUA.length];
+  }
+}
+// Gabungkan kata sapaan (pagi/siang/sore/malam) dengan nama akun jadi satu baris: "Selamat pagi, Najwa"
+function renderGreetingBlock(){
+  const el = document.getElementById('dashboardGreetName');
+  if(!el) return;
+  const name = account && account.name ? account.name : '';
+  el.textContent = name ? `${currentGreetingWord}, ${name}` : currentGreetingWord;
 }
 // Cek ulang tiap menit supaya sapaan otomatis berubah kalau aplikasi dibiarkan terbuka melewati batas jam (pagi/siang/sore/malam)
 setInterval(setGreeting, 60000);
