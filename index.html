@@ -2115,11 +2115,16 @@ function showScanDebug(obj){
 }
 
 async function readReceipt(dataUrl){
+  // Batas waktu 55 detik di sisi HP — jaga-jaga kalau server/koneksi benar-benar tidak
+  // merespons sama sekali, supaya layar "Membaca struk..." tidak menggantung selamanya.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(()=>controller.abort(), 55000);
   try{
     const res = await fetch('/api/scan-receipt', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: dataUrl })
+      body: JSON.stringify({ image: dataUrl }),
+      signal: controller.signal
     });
     const parsed = await res.json().catch(()=>null);
 
@@ -2137,7 +2142,13 @@ async function readReceipt(dataUrl){
     showScanResult(parsed);
   }catch(err){
     console.error('Gagal membaca struk:', err);
-    showScanError('Gagal menghubungi server AI. Cek koneksi internet, atau isi data secara manual di bawah ini.');
+    if(err.name === 'AbortError'){
+      showScanError('Terlalu lama menunggu respons server. Coba scan ulang, atau isi data secara manual di bawah ini.');
+    }else{
+      showScanError('Gagal menghubungi server AI. Cek koneksi internet, atau isi data secara manual di bawah ini.');
+    }
+  }finally{
+    clearTimeout(timeoutId);
   }
 }
 
