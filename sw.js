@@ -2,7 +2,7 @@
 // Catatan: data keuangan tetap butuh koneksi internet (disimpan di Supabase),
 // service worker ini hanya menyimpan file aplikasi (HTML/ikon) agar tampilan
 // tetap bisa dibuka walau sinyal jelek.
-const CACHE_NAME = 'saldo-keluarga-v2';
+const CACHE_NAME = 'saldo-keluarga-v3';
 const APP_SHELL = [
   './index.html',
   './manifest.json',
