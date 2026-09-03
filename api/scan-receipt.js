@@ -72,51 +72,71 @@ Balas HANYA JSON sesuai schema, tanpa penjelasan tambahan.`;
   try {
     const model = 'gemini-flash-latest';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-
-    // Batas waktu 50 detik (di bawah maxDuration 60 detik di vercel.json), supaya kalau
-    // Gemini lambat, kita yang balas error JSON rapi duluan — bukan Vercel yang matikan
-    // paksa function ini dan bikin HP pengguna menunggu tanpa kepastian.
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 50000);
-
-    let geminiRes;
-    try{
-      geminiRes = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey
-        },
-        body: JSON.stringify({
-          contents: [{
-            role: 'user',
-            parts: [
-              { text: prompt },
-              { inline_data: { mime_type: mimeType, data: base64Data } }
-            ]
-          }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            responseSchema: RECEIPT_SCHEMA,
-            temperature: 0.1
-          }
-        }),
-        signal: controller.signal
-      });
-    }catch(fetchErr){
-      if(fetchErr.name === 'AbortError'){
-        res.status(504).json({ error: 'AI terlalu lama merespons, coba scan ulang atau isi manual' });
-        return;
+    const requestBody = JSON.stringify({
+      contents: [{
+        role: 'user',
+        parts: [
+          { text: prompt },
+          { inline_data: { mime_type: mimeType, data: base64Data } }
+        ]
+      }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: RECEIPT_SCHEMA,
+        temperature: 0.1
       }
-      throw fetchErr;
-    }finally{
-      clearTimeout(timeoutId);
+    });
+
+    // Batas waktu 45 detik per percobaan (di bawah maxDuration 60 detik di vercel.json),
+    // supaya kalau Gemini lambat, kita yang balas error JSON rapi duluan — bukan Vercel
+    // yang matikan paksa function ini dan bikin HP pengguna menunggu tanpa kepastian.
+    async function callGemini(){
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+      try{
+        return await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          body: requestBody,
+          signal: controller.signal
+        });
+      }finally{
+        clearTimeout(timeoutId);
+      }
+    }
+
+    // Model AI sering balas 503 ("model lagi sibuk/overload") saat jam ramai — ini bersifat
+    // sementara, jadi dicoba ulang otomatis sampai 3x (dengan jeda) sebelum benar-benar
+    // dianggap gagal, supaya pengguna tidak perlu manual pencet scan ulang tiap kali kena ini.
+    let geminiRes;
+    let lastErrText = '';
+    const MAX_ATTEMPTS = 3;
+    for(let attempt=1; attempt<=MAX_ATTEMPTS; attempt++){
+      try{
+        geminiRes = await callGemini();
+      }catch(fetchErr){
+        if(fetchErr.name === 'AbortError'){
+          res.status(504).json({ error: 'AI terlalu lama merespons, coba scan ulang atau isi manual' });
+          return;
+        }
+        throw fetchErr;
+      }
+
+      if(geminiRes.ok) break;
+
+      lastErrText = await geminiRes.text().catch(() => '');
+      console.error(`Gemini API error (percobaan ${attempt}/${MAX_ATTEMPTS}):`, geminiRes.status, lastErrText);
+
+      const isRetryable = geminiRes.status === 503 || geminiRes.status === 429;
+      if(!isRetryable || attempt === MAX_ATTEMPTS) break;
+      await new Promise(r => setTimeout(r, 1200 * attempt)); // jeda 1.2s, 2.4s sebelum coba lagi
     }
 
     if (!geminiRes.ok) {
-      const errText = await geminiRes.text().catch(() => '');
-      console.error('Gemini API error:', geminiRes.status, errText);
-      res.status(502).json({ error: 'Gagal menghubungi layanan AI, coba lagi sebentar' });
+      const msg = geminiRes.status === 503
+        ? 'Server AI sedang sibuk, coba scan ulang beberapa saat lagi'
+        : 'Gagal menghubungi layanan AI, coba lagi sebentar';
+      res.status(502).json({ error: msg });
       return;
     }
 
