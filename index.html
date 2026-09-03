@@ -571,6 +571,13 @@
     background:none;border:none;color:rgba(255,255,255,0.75);font-size:12px;
     margin-top:20px;text-decoration:underline;cursor:pointer;font-family:'Nunito',sans-serif;
   }
+  .biometric-btn{
+    display:flex; align-items:center; gap:8px; justify-content:center;
+    background:rgba(255,255,255,0.16); border:1.5px solid rgba(255,255,255,0.4);
+    color:#fff; font-family:'Nunito',sans-serif; font-weight:700; font-size:13.5px;
+    padding:11px 20px; border-radius:999px; cursor:pointer; margin:0 0 18px 0;
+  }
+  .biometric-btn:active{background:rgba(255,255,255,0.28);}
   .setup-steps{display:flex; gap:6px; margin-bottom:20px;}
   .setup-steps span{flex:1; height:3px; border-radius:3px; background:rgba(255,255,255,0.25);}
   .setup-steps span.done{background:#fff;}
@@ -675,6 +682,10 @@
       <span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span>
     </div>
     <p class="pin-error" id="pinError">PIN salah, coba lagi</p>
+    <button class="biometric-btn" id="biometricBtn" style="display:none;" onclick="tryBiometricUnlock()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 11a2 2 0 00-2 2c0 1.7-.4 3.4-1.2 4.9M12 11a2 2 0 012 2c0 .6-.1 1.2-.2 1.8M12 11V9a4 4 0 014-4c1 0 1.9.3 2.6.9M12 11V9a4 4 0 00-4-4c-.4 0-.8 0-1.2.1M4.5 9.5C5.4 6.4 8.4 4 12 4M19.5 9.5c.3 1 .5 2 .5 3.1 0 1.3-.2 2.6-.7 3.8M6 20.5c1-1.9 1.5-3.9 1.5-6M9 20.9c.6-1.9.9-3.9.9-5.9"/></svg>
+      Buka dengan Sidik Jari
+    </button>
     <div class="pin-keypad">
       <button class="pin-key" onclick="pinPress('1')">1</button>
       <button class="pin-key" onclick="pinPress('2')">2</button>
@@ -1258,6 +1269,10 @@
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
       Kode Keluarga (untuk HP lain)
     </button>
+    <button class="action-item" id="biometricToggleBtn" onclick="toggleBiometricSetting()">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 11a2 2 0 00-2 2c0 1.7-.4 3.4-1.2 4.9M12 11a2 2 0 012 2c0 .6-.1 1.2-.2 1.8M12 11V9a4 4 0 014-4c1 0 1.9.3 2.6.9M12 11V9a4 4 0 00-4-4c-.4 0-.8 0-1.2.1M4.5 9.5C5.4 6.4 8.4 4 12 4M19.5 9.5c.3 1 .5 2 .5 3.1 0 1.3-.2 2.6-.7 3.8M6 20.5c1-1.9 1.5-3.9 1.5-6M9 20.9c.6-1.9.9-3.9.9-5.9"/></svg>
+      <span id="biometricToggleLabel">Buka dengan Sidik Jari / Face ID</span>
+    </button>
   </div>
 </div>
 
@@ -1482,6 +1497,7 @@ async function initAuth(){
     document.getElementById('setupScreen').style.display='none';
     document.getElementById('pinScreen').style.display='flex';
     document.getElementById('pinSub').textContent = 'Masuk sebagai ' + account.name;
+    setupBiometricOnPinScreen();
   }
 }
 
@@ -1556,6 +1572,115 @@ function checkPin(){
       renderPinDots();
     }, 380);
   }
+}
+
+/* ---------------------------------------------------
+   BUKA DENGAN SIDIK JARI / FACE ID (WebAuthn)
+   Kredensial disimpan per-HP (localStorage) karena sensor sidik jari memang
+   terikat ke perangkat masing-masing — setiap HP keluarga aktifkan sendiri-sendiri
+   dari menu Pengaturan setelah berhasil buka pakai PIN.
+--------------------------------------------------- */
+const BIOMETRIC_CRED_KEY = 'kas_keluarga_biometric_cred_id';
+
+function bufToBase64url(buf){
+  const bytes = new Uint8Array(buf);
+  let str = '';
+  for(let i=0;i<bytes.length;i++) str += String.fromCharCode(bytes[i]);
+  return btoa(str).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function base64urlToBuf(b64url){
+  const b64 = b64url.replace(/-/g,'+').replace(/_/g,'/') + '==='.slice((b64url.length+3)%4);
+  const str = atob(b64);
+  const bytes = new Uint8Array(str.length);
+  for(let i=0;i<str.length;i++) bytes[i] = str.charCodeAt(i);
+  return bytes.buffer;
+}
+async function isBiometricAvailable(){
+  return !!(window.PublicKeyCredential &&
+    navigator.credentials &&
+    await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().catch(()=>false));
+}
+function isBiometricEnrolled(){
+  return !!localStorage.getItem(BIOMETRIC_CRED_KEY);
+}
+
+// Dipanggil tiap kali layar PIN tampil: tunjukkan tombol sidik jari kalau sudah
+// pernah diaktifkan di HP ini, dan langsung tawarkan prompt-nya otomatis.
+async function setupBiometricOnPinScreen(){
+  const btn = document.getElementById('biometricBtn');
+  if(!btn) return;
+  if(isBiometricEnrolled() && await isBiometricAvailable()){
+    btn.style.display = 'flex';
+    tryBiometricUnlock(); // auto-prompt; kalau dibatalkan/gagal, pengguna tetap bisa ketik PIN manual
+  }else{
+    btn.style.display = 'none';
+  }
+}
+
+async function tryBiometricUnlock(){
+  const credId = localStorage.getItem(BIOMETRIC_CRED_KEY);
+  if(!credId || !window.PublicKeyCredential) return;
+  try{
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge,
+        allowCredentials: [{ id: base64urlToBuf(credId), type:'public-key' }],
+        userVerification: 'required',
+        timeout: 60000
+      }
+    });
+    if(assertion) unlockApp();
+  }catch(e){
+    // Dibatalkan pengguna atau gagal verifikasi — biarkan tetap di layar PIN sebagai fallback
+    console.log('Buka dengan sidik jari dibatalkan/gagal:', e.message);
+  }
+}
+
+// Tombol di menu Pengaturan: aktifkan kalau belum, atau matikan kalau sudah aktif di HP ini
+async function toggleBiometricSetting(){
+  if(isBiometricEnrolled()){
+    localStorage.removeItem(BIOMETRIC_CRED_KEY);
+    showToast('Sidik jari/Face ID dinonaktifkan di HP ini');
+    updateBiometricSettingsLabel();
+    return;
+  }
+  if(!window.PublicKeyCredential || !navigator.credentials){
+    showToast('Browser ini belum mendukung buka dengan sidik jari');
+    return;
+  }
+  const available = await isBiometricAvailable();
+  if(!available){
+    showToast('Sidik jari/Face ID tidak tersedia di perangkat ini');
+    return;
+  }
+  try{
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+    const userId = crypto.getRandomValues(new Uint8Array(16));
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge,
+        rp: { name: 'Saldo Keluarga' },
+        user: { id: userId, name: (account && account.name) || 'Keluarga', displayName: (account && account.name) || 'Keluarga' },
+        pubKeyCredParams: [{ type:'public-key', alg:-7 }, { type:'public-key', alg:-257 }],
+        authenticatorSelection: { authenticatorAttachment:'platform', userVerification:'required', residentKey:'preferred' },
+        timeout: 60000
+      }
+    });
+    localStorage.setItem(BIOMETRIC_CRED_KEY, bufToBase64url(cred.rawId));
+    showToast('Sidik jari/Face ID berhasil diaktifkan di HP ini');
+    updateBiometricSettingsLabel();
+  }catch(e){
+    console.error(e);
+    showToast('Gagal mengaktifkan sidik jari/Face ID');
+  }
+}
+function updateBiometricSettingsLabel(){
+  const label = document.getElementById('biometricToggleLabel');
+  if(!label) return;
+  label.textContent = isBiometricEnrolled()
+    ? 'Matikan Buka dengan Sidik Jari (HP ini)'
+    : 'Buka dengan Sidik Jari / Face ID';
 }
 function unlockApp(){
   document.getElementById('pinScreen').style.display='none';
@@ -2722,6 +2847,7 @@ function openSettingsSheet(){
     renderAvatarEl(document.getElementById('settingsAvatar'));
     document.getElementById('removeAvatarBtn').style.display = account.avatar ? 'flex' : 'none';
   }
+  updateBiometricSettingsLabel();
   openSheet('settingsOverlay');
 }
 
